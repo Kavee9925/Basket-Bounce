@@ -1,0 +1,4 @@
+package com.basketbounce.model;
+public enum GameState {
+    MENU, PLAYING, PAUSED, BONUS_QUESTION, LEVEL_COMPLETE, GAME_OVER, VICTORY, PROFILE, LEADERBOARD, HELP, SETTINGS
+}
