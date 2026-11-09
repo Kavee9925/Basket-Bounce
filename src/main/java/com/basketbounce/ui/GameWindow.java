@@ -1,29 +1,64 @@
 package com.basketbounce.ui;
 
-import com.basketbounce.api.*;
-import com.basketbounce.game.*;
-import com.basketbounce.model.*;
-import com.basketbounce.storage.*;
-
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.geom.*;
-import java.time.*;
-import java.util.*;
+import java.awt.BasicStroke;
+import java.awt.CardLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Polygon;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import javax.swing.AbstractAction;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
+
+import com.basketbounce.api.FishGameAPI;
+import com.basketbounce.api.Question;
+import com.basketbounce.game.AudioManager;
+import com.basketbounce.game.Basket;
+import com.basketbounce.game.LevelManager;
+import com.basketbounce.game.LifeManager;
+import com.basketbounce.game.ObjectSpawner;
+import com.basketbounce.game.ScoreManager;
+import com.basketbounce.model.FallingObject;
+import com.basketbounce.model.GameState;
+import com.basketbounce.model.WeatherType;
+import com.basketbounce.storage.SaveManager;
 
 public class GameWindow extends JFrame {
+    
     private final SaveManager saves = new SaveManager();
     private final GamePanel panel = new GamePanel();
     private final CardLayout cards = new CardLayout();
     private final JPanel root = new JPanel(cards);
-    private final ExecutorService apiExecutor = Executors.newSingleThreadExecutor(r -> {
+    private final ExecutorService apiExecutor = Executors.newSingleThreadExecutor(r ->{
         Thread t = new Thread(r, "fish-api");
         t.setDaemon(true);
         return t;
     });
+    
     private ScheduledExecutorService clock;
     private Question pending;
     private boolean left, right;
@@ -143,6 +178,21 @@ public class GameWindow extends JFrame {
         b.dispose();
     }
 
+    private void drawCompactButton(Graphics2D g, String text, int x, int y, int w, int h, Color color) {
+        Graphics2D button = (Graphics2D) g.create();
+        button.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        button.setColor(new Color(0, 0, 0, 55));
+        button.fillRoundRect(x + 2, y + 3, w, h, 14, 14);
+        button.setPaint(new GradientPaint(x, y, color.brighter(), x, y + h, color.darker()));
+        button.fillRoundRect(x, y, w, h, 14, 14);
+        button.setColor(new Color(255, 255, 255, 90));
+        button.drawRoundRect(x, y, w - 1, h - 1, 14, 14);
+        button.setColor(Color.WHITE);
+        button.setFont(new Font("SansSerif", Font.BOLD, 12));
+        center(button, text, x + w / 2, y + h / 2 + 4);
+        button.dispose();
+    }
+
     private void center(Graphics2D g, String s, int x, int y) {
         FontMetrics fm = g.getFontMetrics();
         g.drawString(s, x - fm.stringWidth(s) / 2, y);
@@ -245,15 +295,14 @@ public class GameWindow extends JFrame {
                 double ox = (getWidth() - 1000 * scale) / 2.0, oy = (getHeight() - 680 * scale) / 2.0;
                 x = (int)((x - ox) / scale);
                 y = (int)((y - oy) / scale);
-                if (y >= 270 && y <= 325) start();
-                else if (y >= 340 && y <= 388) {
-                    state = GameState.LEADERBOARD;
-                } else if (y >= 402 && y <= 450) {
-                    state = GameState.HELP;
-                } else if (y >= 464 && y <= 512) {
-                    state = GameState.PROFILE;
-                } else if (y >= 526 && y <= 574) {
-                    state = GameState.SETTINGS;
+                if (x >= 363 && x <= 637) {
+                    if (y >= 255 && y <= 297) start();
+                    else if (y >= 305 && y <= 347) AccountDialogs.showLogin(this);
+                    else if (y >= 355 && y <= 397) AccountDialogs.showCreateAccount(this);
+                    else if (y >= 405 && y <= 447) state = GameState.LEADERBOARD;
+                    else if (y >= 455 && y <= 497) state = GameState.HELP;
+                    else if (y >= 505 && y <= 547) state = GameState.PROFILE;
+                    else if (y >= 555 && y <= 597) state = GameState.SETTINGS;
                 }
             } else if (state == GameState.PAUSED) {
                 if (y >= 270 && y <= 320) state = GameState.PLAYING;
@@ -497,12 +546,19 @@ public class GameWindow extends JFrame {
             g.setColor(new Color(150, 225, 205));
             g.setFont(new Font("SansSerif", Font.BOLD, 12));
             center(g, "GUEST MODE  •  YOUR SCORES SAVE ON THIS COMPUTER", w / 2, 239);
+            // Keep every menu action in one evenly spaced, consistently sized column.
             int x = w / 2 - 137;
-            drawButton(g, "PLAY AS GUEST", x, 270, 274, 55, new Color(35, 177, 137));
-            drawButton(g, "LEADERBOARD", x, 340, 274, 48, new Color(64, 116, 190));
-            drawButton(g, "HOW TO PLAY", x, 402, 274, 48, new Color(116, 100, 190));
-            drawButton(g, "GUEST PROFILE", x, 464, 274, 48, new Color(194, 133, 67));
-            drawButton(g, "SETTINGS", x, 526, 274, 48, new Color(76, 103, 132));
+            int buttonWidth = 274;
+            int buttonHeight = 42;
+            int buttonGap = 8;
+            int firstButtonY = 255;
+            drawButton(g, "PLAY AS GUEST", x, firstButtonY, buttonWidth, buttonHeight, new Color(35, 177, 137));
+            drawButton(g, "LOGIN", x, firstButtonY + (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(64, 116, 190));
+            drawButton(g, "CREATE ACCOUNT", x, firstButtonY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(35, 157, 125));
+            drawButton(g, "LEADERBOARD", x, firstButtonY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(64, 116, 190));
+            drawButton(g, "HOW TO PLAY", x, firstButtonY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(116, 100, 190));
+            drawButton(g, "GUEST PROFILE", x, firstButtonY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(194, 133, 67));
+            drawButton(g, "SETTINGS", x, firstButtonY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(76, 103, 132));
             g.setColor(new Color(225, 235, 250, 150));
             g.setFont(new Font("SansSerif", Font.PLAIN, 11));
             center(g, "10 LEVELS  •  5 COLLECTIBLES  •  BONUS CHALLENGES", w / 2, h - 18);
