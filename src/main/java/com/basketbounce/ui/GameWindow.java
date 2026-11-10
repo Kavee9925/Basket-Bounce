@@ -62,6 +62,24 @@ public class GameWindow extends JFrame {
         bindKey("pressed D", "d-pressed", () -> right = true);
         bindKey("released D", "d-released", () -> right = false);
         bindKey("pressed ESCAPE", "pause-game", () -> panel.escape());
+        for (char digit = '0'; digit <= '9'; digit++) {
+            final char keyDigit = digit;
+            bindKey("typed " + keyDigit, "fish-answer-" + keyDigit, () -> {
+                if (panel.state == GameState.BONUS_QUESTION && panel.questionAnswer.length() < 3) {
+                    panel.questionAnswer += keyDigit;
+                    panel.repaint();
+                }
+            });
+        }
+        bindKey("pressed BACK_SPACE", "fish-answer-backspace", () -> {
+            if (panel.state == GameState.BONUS_QUESTION && !panel.questionAnswer.isEmpty()) {
+                panel.questionAnswer = panel.questionAnswer.substring(0, panel.questionAnswer.length() - 1);
+                panel.repaint();
+            }
+        });
+        bindKey("pressed ENTER", "fish-answer-submit", () -> {
+            if (panel.state == GameState.BONUS_QUESTION) panel.answerQuestion();
+        });
     }
 
     private void bindKey(String stroke, String name, Runnable action) {
@@ -94,6 +112,7 @@ public class GameWindow extends JFrame {
                 SwingUtilities.invokeLater(() -> {
                     if (panel.state == GameState.PLAYING) {
                         pending = q;
+                        panel.questionAnswer = "";
                         panel.state = GameState.BONUS_QUESTION;
                     }
                     panel.questionLoading = false;
@@ -174,6 +193,7 @@ public class GameWindow extends JFrame {
         long last = System.nanoTime(), lastQuestionNanos = System.nanoTime();
         boolean questionLoading = false;
         String apiMessage = "";
+        String questionAnswer = "";
         double anim = 0;
         int lightning = 0;
         String guestName = "Guest Player";
@@ -294,24 +314,24 @@ public class GameWindow extends JFrame {
                     sound = !sound;
                 }
             } else if (state == GameState.BONUS_QUESTION) {
-                if (y >= 490 && y <= 560) {
-                    answerQuestion();
-                }
+                if (y >= 485 && y <= 565) answerQuestion();
             }
             requestFocusInWindow();
             repaint();
         }
         void answerQuestion() {
-            if (pending == null) return;
-            String answer = JOptionPane.showInputDialog(this, "Enter the fish count:");
-            if (answer == null) return;
-            if (normalizePuzzleAnswer(answer).equals(normalizePuzzleAnswer(pending.answer()))) {
+            if (pending == null || questionAnswer.isBlank()) return;
+            if (normalizePuzzleAnswer(questionAnswer).equals(normalizePuzzleAnswer(pending.answer()))) {
                 boolean gainedLife = lives.reward();
                 if (!gainedLife) score.addBonus(150);
-                JOptionPane.showMessageDialog(this, gainedLife ? "Correct! +1 life" : "Correct! Maximum lives reached. +150 points");
-            } else JOptionPane.showMessageDialog(this, "Incorrect answer. No reward. Please enter the correct fish count.");
+                apiMessage = gainedLife ? "Correct fish count! +1 life" : "Correct fish count! +150 points";
+            } else {
+                apiMessage = "Incorrect fish count. No reward this time.";
+            }
             pending = null;
+            questionAnswer = "";
             state = GameState.PLAYING;
+            repaint();
         }
         String normalizePuzzleAnswer(String value) {
             return value == null ? "" : value.trim().replaceAll("[^0-9]+", ",").replaceAll("^,|,$", "");
@@ -556,21 +576,37 @@ public class GameWindow extends JFrame {
             g.setColor(new Color(7, 13, 25, 205));
             g.fillRect(0, 0, w, h);
             g.setColor(new Color(36, 54, 87));
-            g.fillRoundRect(w / 2 - 255, 75, 510, 500, 28, 28);
+            g.fillRoundRect(w / 2 - 255, 65, 510, 530, 28, 28);
             g.setColor(new Color(255, 219, 99));
             g.setFont(new Font("SansSerif", Font.BOLD, 30));
-            center(g, "BONUS CHALLENGE", w / 2, 125);
+            center(g, "BONUS CHALLENGE", w / 2, 112);
             g.setColor(Color.WHITE);
             g.setFont(new Font("SansSerif", Font.PLAIN, 16));
-            center(g, "Count the fish in the official Fish Game API puzzle", w / 2, 157);
+            center(g, "Count the fish in the official Fish Game API puzzle", w / 2, 143);
             if (pending != null && pending.image() != null) {
-                int iw = Math.min(330, pending.image().getWidth()), ih = Math.min(290, pending.image().getHeight());
-                g.drawImage(pending.image(), w / 2 - iw / 2, 185, iw, ih, null);
+                int sourceWidth = pending.image().getWidth();
+                int sourceHeight = pending.image().getHeight();
+                double imageScale = Math.min(330.0 / sourceWidth, 245.0 / sourceHeight);
+                int imageWidth = (int) (sourceWidth * imageScale);
+                int imageHeight = (int) (sourceHeight * imageScale);
+                g.drawImage(pending.image(), w / 2 - imageWidth / 2, 158, imageWidth, imageHeight, null);
             }
-            drawButton(g, "ANSWER QUESTION", w / 2 - 125, 500, 250, 50, new Color(42, 173, 133));
+
+            g.setColor(new Color(220, 230, 245));
+            g.setFont(new Font("SansSerif", Font.BOLD, 14));
+            center(g, "YOUR FISH COUNT", w / 2, 433);
+            g.setColor(new Color(16, 27, 48));
+            g.fillRoundRect(w / 2 - 105, 447, 210, 48, 13, 13);
+            g.setColor(new Color(103, 211, 183));
+            g.setStroke(new BasicStroke(2f));
+            g.drawRoundRect(w / 2 - 105, 447, 210, 48, 13, 13);
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("SansSerif", Font.BOLD, 25));
+            center(g, questionAnswer.isEmpty() ? "_" : questionAnswer, w / 2, 479);
+            drawButton(g, "SUBMIT ANSWER", w / 2 - 125, 510, 250, 48, new Color(42, 173, 133));
             g.setFont(new Font("SansSerif", Font.PLAIN, 12));
             g.setColor(new Color(220, 230, 245));
-            center(g, "Enter the fish count • Correct answer: +1 life or +150 points", w / 2, 570);
+            center(g, "Type the number and press ENTER  •  Correct: +1 life or +150 points", w / 2, 578);
         }
         void drawResult(Graphics2D g, int w, int h) {
             g.setPaint(new GradientPaint(0, 0, new Color(31, 45, 80), w, h, new Color(85, 114, 151)));
