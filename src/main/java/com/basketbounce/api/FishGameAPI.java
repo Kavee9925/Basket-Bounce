@@ -62,8 +62,7 @@ public class FishGameAPI {
         } catch (RuntimeException ex) {
             throw new IOException("Fish API returned invalid JSON: " + safeMessage(ex), ex);
         }
-        // Official live response shape: { "question": "image URL", "fish": 6, "chest": 5 }.
-        // The two numeric fields are the puzzle's answers, in fish-then-chest order.
+        // The puzzle image contains both fish and treasure; only the fish count is the answer.
         String answer = readAnswer(json);
         String imageValue = readPrimitive(json, "question", "image", "data");
         if (imageValue.isBlank()) throw new IOException("Fish API JSON is missing the question image URL");
@@ -73,12 +72,8 @@ public class FishGameAPI {
 
     static String readAnswer(JsonObject json) throws IOException {
         String fish = readPrimitive(json, "fish");
-        String chest = readPrimitive(json, "chest");
-        if (!fish.isBlank() && !chest.isBlank()) return fish.trim() + "," + chest.trim();
-        // Compatibility with alternate documented/older response variants.
-        String solution = readPrimitive(json, "solution", "answer", "result");
-        if (!solution.isBlank()) return solution.trim();
-        throw new IOException("Fish API JSON is missing the fish/chest solution values");
+        if (!fish.isBlank()) return fish.trim();
+        throw new IOException("Fish API JSON is missing the fish count");
     }
 
     private static String readPrimitive(JsonObject json, String... keys) {

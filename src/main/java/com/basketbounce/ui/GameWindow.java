@@ -303,13 +303,13 @@ public class GameWindow extends JFrame {
         }
         void answerQuestion() {
             if (pending == null) return;
-            String answer = JOptionPane.showInputDialog(this, "Enter the two values in order: fish, chest (example: 6,5):");
+            String answer = JOptionPane.showInputDialog(this, "Enter the fish count:");
             if (answer == null) return;
             if (normalizePuzzleAnswer(answer).equals(normalizePuzzleAnswer(pending.answer()))) {
                 boolean gainedLife = lives.reward();
                 if (!gainedLife) score.addBonus(150);
                 JOptionPane.showMessageDialog(this, gainedLife ? "Correct! +1 life" : "Correct! Maximum lives reached. +150 points");
-            } else JOptionPane.showMessageDialog(this, "Incorrect answer. No reward. Enter fish value first, then chest value.");
+            } else JOptionPane.showMessageDialog(this, "Incorrect answer. No reward. Please enter the correct fish count.");
             pending = null;
             state = GameState.PLAYING;
         }
@@ -562,7 +562,7 @@ public class GameWindow extends JFrame {
             center(g, "BONUS CHALLENGE", w / 2, 125);
             g.setColor(Color.WHITE);
             g.setFont(new Font("SansSerif", Font.PLAIN, 16));
-            center(g, "Find both values in the official Fish Game API puzzle", w / 2, 157);
+            center(g, "Count the fish in the official Fish Game API puzzle", w / 2, 157);
             if (pending != null && pending.image() != null) {
                 int iw = Math.min(330, pending.image().getWidth()), ih = Math.min(290, pending.image().getHeight());
                 g.drawImage(pending.image(), w / 2 - iw / 2, 185, iw, ih, null);
@@ -570,7 +570,7 @@ public class GameWindow extends JFrame {
             drawButton(g, "ANSWER QUESTION", w / 2 - 125, 500, 250, 50, new Color(42, 173, 133));
             g.setFont(new Font("SansSerif", Font.PLAIN, 12));
             g.setColor(new Color(220, 230, 245));
-            center(g, "Enter fish value, then chest value • Correct answer: +1 life or +150 points", w / 2, 570);
+            center(g, "Enter the fish count • Correct answer: +1 life or +150 points", w / 2, 570);
         }
         void drawResult(Graphics2D g, int w, int h) {
             g.setPaint(new GradientPaint(0, 0, new Color(31, 45, 80), w, h, new Color(85, 114, 151)));
