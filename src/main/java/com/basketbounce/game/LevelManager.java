@@ -22,7 +22,7 @@ public class LevelManager {
     };
     // Level 1 is deliberately slow. Speed rises steadily without an abrupt jump.
     private static final double[] FALL_SPEED = {
-        80, 82, 98, 116, 136, 158, 182, 208, 236, 266
+        86, 98, 112, 128, 146, 166, 188, 212, 238, 266
     };
     private static final int[] SPAWN_MILLIS = {
         2200, 2050, 1900, 1750, 1600, 1475, 1350, 1225, 1125, 1025

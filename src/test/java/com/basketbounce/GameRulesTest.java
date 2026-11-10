@@ -56,7 +56,7 @@ class GameRulesTest {
     @Test
     void levelOneIsSlowest() {
         LevelManager levels = new LevelManager();
-        assertEquals(80, levels.speed(), 0.001);
+        assertEquals(86, levels.speed(), 0.001);
         assertEquals(2200, levels.spawnMillis());
     }
 }

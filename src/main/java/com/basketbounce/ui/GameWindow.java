@@ -1,64 +1,29 @@
 package com.basketbounce.ui;
 
-import java.awt.BasicStroke;
-import java.awt.CardLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.GradientPaint;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Polygon;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
-import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.util.ArrayList;
-import java.util.Iterator;
+import com.basketbounce.api.*;
+import com.basketbounce.game.*;
+import com.basketbounce.model.*;
+import com.basketbounce.storage.*;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.geom.*;
+import java.time.*;
+import java.util.*;
 import java.util.List;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import javax.swing.AbstractAction;
-import javax.swing.JComponent;
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.KeyStroke;
-import javax.swing.SwingUtilities;
-
-import com.basketbounce.api.FishGameAPI;
-import com.basketbounce.api.Question;
-import com.basketbounce.game.AudioManager;
-import com.basketbounce.game.Basket;
-import com.basketbounce.game.LevelManager;
-import com.basketbounce.game.LifeManager;
-import com.basketbounce.game.ObjectSpawner;
-import com.basketbounce.game.ScoreManager;
-import com.basketbounce.model.FallingObject;
-import com.basketbounce.model.GameState;
-import com.basketbounce.model.WeatherType;
-import com.basketbounce.storage.SaveManager;
+import java.util.concurrent.*;
 
 public class GameWindow extends JFrame {
-    
     private final SaveManager saves = new SaveManager();
     private final GamePanel panel = new GamePanel();
     private final CardLayout cards = new CardLayout();
     private final JPanel root = new JPanel(cards);
-    private final ExecutorService apiExecutor = Executors.newSingleThreadExecutor(r ->{
+    private final ExecutorService apiExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "fish-api");
         t.setDaemon(true);
         return t;
     });
-    
     private ScheduledExecutorService clock;
     private Question pending;
     private boolean left, right;
