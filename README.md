@@ -1,17 +1,18 @@
 # Basket Bounce 2D — Java 17
 
-A playable Java Swing/Java2D arcade game. The default path is **Play as Guest**: no login, registration, MySQL, XAMPP, or database setup is required.
+A playable Java Swing/Java2D arcade game with MongoDB-backed accounts and player statistics. Players can create an account, log in, or continue as a guest.
 
 ## Requirements
 - JDK 17 or newer
 - Maven 3.8+
+- MongoDB Community Server running locally on `mongodb://localhost:27017`
 - Internet connection for live Fish Game bonus puzzles (the core game works offline)
 
 ## Run in VS Code (Windows PowerShell)
 1. Extract `BasketBounce.zip`.
 2. Open the extracted `BasketBounce` folder in VS Code.
 3. Install the **Extension Pack for Java** (Microsoft) and **Maven for Java** if VS Code prompts you.
-4. Open Terminal → New Terminal and run:
+4. Start the MongoDB service, then open Terminal → New Terminal and run:
 
 ```powershell
 java -version
@@ -20,7 +21,7 @@ mvn clean compile
 mvn exec:java
 ```
 
-The first Maven run downloads Gson and Maven plugins. The game window then opens. You can also use `mvn test` to run the included tests.
+The first Maven run downloads Gson, the MongoDB Java driver, BCrypt and Maven plugins. The game window then opens. You can also use `mvn test` to run the included tests.
 
 ## Run in Eclipse
 1. File → Import → Existing Maven Projects.
@@ -46,12 +47,25 @@ The first Maven run downloads Gson and Maven plugins. The game window then opens
 API: `http://marcconrad.com/uob/fish/api.php?out=json`
 Documentation: `https://marcconrad.com/uob/fish/doc.php`
 
-## Guest save data
-Guest profile statistics and leaderboard runs are saved locally at:
+## MongoDB database
+
+The game connects using the supplied local MongoDB URL:
+
+`mongodb://localhost:27017`
+
+The database name is `basketbounce`. MongoDB creates it automatically when the game starts and creates these collections:
+
+- `users` — full name, username, email, BCrypt password hash, account creation time and last login time.
+- `player_profiles` — each account's highest score, highest level, total games and total score.
+- `game_runs` — completed game results linked to the account.
+
+Usernames and email addresses are unique. Passwords are stored as BCrypt hashes, never as plain text. Login accepts either username or email. Database operations run outside the Swing UI thread so account actions do not freeze the game.
+
+If MongoDB is not running, the game can still be opened and played as a guest, but Login and Create Account require the MongoDB service to be running. Guest statistics continue to be saved locally at:
 
 `%USERPROFILE%\\.basketbounce\\guest-data.json`
 
-This is a local JSON save file, not a database. Deleting that file resets local guest statistics. Scores are stored on this computer only; they are not shared online.
+Guest records remain local; signed-in account records are stored in MongoDB.
 
 ## Project structure
 - `src/main/java/com/basketbounce/Main.java` — application entry point
@@ -59,10 +73,10 @@ This is a local JSON save file, not a database. Deleting that file resets local 
 - `game/` — basket, spawner, score, lives and level systems
 - `model/` — game states, weather and falling objects
 - `api/` — official API client and question model
-- `storage/` — local guest profile and leaderboard persistence
+- `storage/` — MongoDB authentication, account profiles and game-result persistence, plus local guest saves
 
 ## Notes / limitations
-- MySQL authentication and database persistence from the original master prompt are intentionally replaced by Guest Mode and local file persistence, as requested. There is no account login or cross-device leaderboard.
+- MongoDB is used for account registration, login, player profiles and signed-in game results. Guest Mode remains available and uses local file persistence.
 - Graphics are procedurally drawn with Java2D, so no external image/sprite pack is needed.
 - A short synthesized three-note collection chime plays when a collectible is caught. The existing sound toggle turns it on or off; no external audio files are required.
 - The Fish Game endpoint must be reachable for bonus questions. API response/image format changes or network outages are handled as a visible unavailable message; core gameplay remains playable.

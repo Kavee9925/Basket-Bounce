@@ -1,15 +1,16 @@
 package com.basketbounce.ui;
 
+import com.basketbounce.storage.MongoDBService;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.basic.BasicButtonUI;
 import java.awt.*;
 import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 
-/**
- * Displays Login and Create Account demo forms using the Basket Bounce menu theme.
- * No account data is stored because this project has no database/authentication backend.
- */
+/** Displays MongoDB-backed Login and Create Account forms in the existing game theme. */
 final class AccountDialogs {
     private static final Color NAVY = new Color(17, 29, 65);
     private static final Color BLUE = new Color(64, 116, 190);
@@ -21,13 +22,12 @@ final class AccountDialogs {
     private AccountDialogs() {
     }
 
-    static void showLogin(Component parent) {
+    static void showLogin(Component parent, Consumer<MongoDBService.UserAccount> onLogin) {
         JTextField usernameField = createTextField();
         JPasswordField passwordField = createPasswordField();
         JLabel status = createStatusLabel();
-
         JPanel fields = createFieldsPanel();
-        addFormRow(fields, "Username", usernameField);
+        addFormRow(fields, "Username or Email", usernameField);
         addFormRow(fields, "Password", passwordField);
 
         JDialog dialog = createDialog(parent, "LOGIN", "Welcome back! Enter your details to continue.", 500, 390);
@@ -36,29 +36,47 @@ final class AccountDialogs {
 
         submitButton.addActionListener(event -> {
             char[] password = passwordField.getPassword();
-            if (usernameField.getText().trim().isEmpty() || password.length == 0) {
-                status.setForeground(new Color(255, 190, 150));
-                status.setText("Please enter both your username and password.");
-            } else {
-                status.setForeground(new Color(178, 235, 215));
-                status.setText("Demo only: login needs a connected database and backend.");
+            String loginValue = usernameField.getText().trim();
+            if (loginValue.isEmpty() || password.length == 0) {
+                showError(status, "Please enter both your username/email and password.");
+                Arrays.fill(password, '\0');
+                return;
             }
-            Arrays.fill(password, '\0');
+            submitButton.setEnabled(false);
+            status.setForeground(TEXT);
+            status.setText("Connecting to MongoDB...");
+            new SwingWorker<MongoDBService.UserAccount, Void>() {
+                @Override
+                protected MongoDBService.UserAccount doInBackground() {
+                    return MongoDBService.getInstance().login(loginValue, password);
+                }
+
+                @Override
+                protected void done() {
+                    Arrays.fill(password, '\0');
+                    submitButton.setEnabled(true);
+                    try {
+                        MongoDBService.UserAccount account = get();
+                        onLogin.accept(account);
+                        dialog.dispose();
+                    } catch (Exception exception) {
+                        showError(status, errorMessage(exception));
+                    }
+                }
+            }.execute();
         });
         cancelButton.addActionListener(event -> dialog.dispose());
-
         showDialogContent(dialog, fields, status, submitButton, cancelButton);
         dialog.setVisible(true);
     }
 
-    static void showCreateAccount(Component parent) {
+    static void showCreateAccount(Component parent, Consumer<MongoDBService.UserAccount> onLogin) {
         JTextField fullNameField = createTextField();
         JTextField usernameField = createTextField();
         JTextField emailField = createTextField();
         JPasswordField passwordField = createPasswordField();
         JPasswordField confirmPasswordField = createPasswordField();
         JLabel status = createStatusLabel();
-
         JPanel fields = createFieldsPanel();
         addFormRow(fields, "Full Name", fullNameField);
         addFormRow(fields, "Username", usernameField);
@@ -66,42 +84,64 @@ final class AccountDialogs {
         addFormRow(fields, "Password", passwordField);
         addFormRow(fields, "Confirm Password", confirmPasswordField);
 
-        JDialog dialog = createDialog(
-                parent,
-                "CREATE ACCOUNT",
-                "Fill in the details below to set up your profile.",
-                540,
-                535
-        );
+        JDialog dialog = createDialog(parent, "CREATE ACCOUNT",
+                "Fill in the details below to set up your profile.", 540, 535);
         JButton createButton = createActionButton("CREATE ACCOUNT", new Color(166, 235, 207));
         JButton cancelButton = createActionButton("CANCEL", new Color(255, 218, 184));
 
         createButton.addActionListener(event -> {
             char[] password = passwordField.getPassword();
             char[] confirmPassword = confirmPasswordField.getPassword();
-            String validationMessage = validateAccountDetails(
-                    fullNameField.getText().trim(),
-                    usernameField.getText().trim(),
-                    emailField.getText().trim(),
-                    password,
-                    confirmPassword
-            );
-
+            String fullName = fullNameField.getText().trim();
+            String username = usernameField.getText().trim();
+            String email = emailField.getText().trim();
+            String validationMessage = validateAccountDetails(fullName, username, email, password, confirmPassword);
             if (validationMessage != null) {
-                status.setForeground(new Color(255, 190, 150));
-                status.setText(validationMessage);
-            } else {
-                status.setForeground(new Color(178, 235, 215));
-                status.setText("Demo only: account creation needs a connected database and backend.");
+                showError(status, validationMessage);
+                Arrays.fill(password, '\0');
+                Arrays.fill(confirmPassword, '\0');
+                return;
             }
 
-            Arrays.fill(password, '\0');
-            Arrays.fill(confirmPassword, '\0');
+            createButton.setEnabled(false);
+            status.setForeground(TEXT);
+            status.setText("Saving account to MongoDB...");
+            new SwingWorker<MongoDBService.UserAccount, Void>() {
+                @Override
+                protected MongoDBService.UserAccount doInBackground() {
+                    return MongoDBService.getInstance().createAccount(fullName, username, email, password);
+                }
+
+                @Override
+                protected void done() {
+                    Arrays.fill(password, '\0');
+                    Arrays.fill(confirmPassword, '\0');
+                    createButton.setEnabled(true);
+                    try {
+                        MongoDBService.UserAccount account = get();
+                        onLogin.accept(account);
+                        dialog.dispose();
+                    } catch (Exception exception) {
+                        showError(status, errorMessage(exception));
+                    }
+                }
+            }.execute();
         });
         cancelButton.addActionListener(event -> dialog.dispose());
-
         showDialogContent(dialog, fields, status, createButton, cancelButton);
         dialog.setVisible(true);
+    }
+
+    private static void showError(JLabel status, String message) {
+        status.setForeground(new Color(255, 190, 150));
+        status.setText(message);
+    }
+
+    private static String errorMessage(Exception exception) {
+        Throwable cause = exception instanceof ExecutionException && exception.getCause() != null
+                ? exception.getCause() : exception;
+        if (cause instanceof IllegalArgumentException) return cause.getMessage();
+        return "Cannot connect to MongoDB. Start MongoDB and try again.";
     }
 
     private static JDialog createDialog(Component parent, String title, String subtitle, int width, int height) {

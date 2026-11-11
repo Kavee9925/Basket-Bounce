@@ -31,6 +31,13 @@ public class GameWindow extends JFrame {
     private int lastLevel = 1;
     private boolean sound = true;
     private final AudioManager audio = new AudioManager();
+    private final ExecutorService databaseExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "mongodb-storage");
+        t.setDaemon(true);
+        return t;
+    });
+    private volatile MongoDBService.UserAccount activeAccount;
+    private volatile MongoDBService.PlayerStats accountStats = new MongoDBService.PlayerStats(0, 1, 0, 0);
 
     public GameWindow() {
         super("Basket Bounce");
@@ -40,6 +47,8 @@ public class GameWindow extends JFrame {
             public void windowClosed(WindowEvent e) {
                 audio.close();
                 apiExecutor.shutdownNow();
+                databaseExecutor.shutdown();
+                MongoDBService.getInstance().close();
             }
         });
         setSize(1000, 680);
@@ -140,7 +149,22 @@ public class GameWindow extends JFrame {
             clock.shutdownNow();
             clock = null;
         }
-        saves.save(panel.score.score(), panel.level.level());
+        if (activeAccount == null) {
+            saves.save(panel.score.score(), panel.level.level());
+        } else {
+            MongoDBService.UserAccount account = activeAccount;
+            int finalScore = panel.score.score();
+            int finalLevel = panel.level.level();
+            databaseExecutor.submit(() -> {
+                try {
+                    MongoDBService.getInstance().saveGame(account, finalScore, finalLevel);
+                    accountStats = MongoDBService.getInstance().getPlayerStats(account);
+                    SwingUtilities.invokeLater(panel::repaint);
+                } catch (Exception exception) {
+                    System.err.println("Could not save game results to MongoDB: " + exception.getMessage());
+                }
+            });
+        }
         lastLevel = panel.level.level();
         panel.state = panel.level.level() == 10 && panel.level.complete(panel.score.score()) ? GameState.VICTORY : GameState.GAME_OVER;
         panel.repaint();
@@ -150,6 +174,20 @@ public class GameWindow extends JFrame {
         panel.state = GameState.MENU;
         panel.repaint();
         panel.requestFocusInWindow();
+    }
+
+    private void setActiveAccount(MongoDBService.UserAccount account) {
+        activeAccount = account;
+        panel.guestName = account.username();
+        databaseExecutor.submit(() -> {
+            try {
+                accountStats = MongoDBService.getInstance().getPlayerStats(account);
+                SwingUtilities.invokeLater(panel::repaint);
+            } catch (Exception exception) {
+                System.err.println("Could not load player profile: " + exception.getMessage());
+            }
+        });
+        panel.repaint();
     }
 
     private void drawButton(Graphics2D g, String text, int x, int y, int w, int h, Color c) {
@@ -290,8 +328,8 @@ public class GameWindow extends JFrame {
                 y = (int)((y - oy) / scale);
                 if (x >= 363 && x <= 637) {
                     if (y >= 255 && y <= 297) start();
-                    else if (y >= 305 && y <= 347) AccountDialogs.showLogin(this);
-                    else if (y >= 355 && y <= 397) AccountDialogs.showCreateAccount(this);
+                    else if (y >= 305 && y <= 347) AccountDialogs.showLogin(this, GameWindow.this::setActiveAccount);
+                    else if (y >= 355 && y <= 397) AccountDialogs.showCreateAccount(this, GameWindow.this::setActiveAccount);
                     else if (y >= 405 && y <= 447) state = GameState.LEADERBOARD;
                     else if (y >= 455 && y <= 497) state = GameState.HELP;
                     else if (y >= 505 && y <= 547) state = GameState.PROFILE;
@@ -315,7 +353,7 @@ public class GameWindow extends JFrame {
                 else if (y >= 470 && y <= 525) menu();
             } else if (state == GameState.PROFILE || state == GameState.LEADERBOARD || state == GameState.HELP || state == GameState.SETTINGS) {
                 if (y > getHeight() - 90) menu();
-                else if (state == GameState.PROFILE && y > 250 && y < 315) {
+                else if (state == GameState.PROFILE && activeAccount == null && y > 250 && y < 315) {
                     String n = JOptionPane.showInputDialog(this, "Enter guest display name:", saves.profile().playerName);
                     saves.rename(n);
                 } else if (state == GameState.SETTINGS && y >= 230 && y <= 280) {
@@ -627,7 +665,8 @@ public class GameWindow extends JFrame {
             g.setColor(Color.WHITE);
             g.setFont(new Font("SansSerif", Font.BOLD, 22));
             center(g, "FINAL SCORE  " + score.score(), w / 2, 235);
-            center(g, "HIGHEST SCORE  " + saves.profile().highestScore, w / 2, 280);
+            int highestScore = activeAccount == null ? saves.profile().highestScore : accountStats.highestScore();
+            center(g, "HIGHEST SCORE  " + highestScore, w / 2, 280);
             center(g, "LEVEL REACHED  " + level.level(), w / 2, 325);
             drawButton(g, "PLAY AGAIN", w / 2 - 125, 400, 250, 52, new Color(44, 173, 132));
             drawButton(g, "MAIN MENU", w / 2 - 125, 470, 250, 52, new Color(72, 115, 180));
@@ -641,13 +680,18 @@ public class GameWindow extends JFrame {
             g.setFont(new Font("SansSerif", Font.PLAIN, 17));
             int y = 130;
             if (state == GameState.PROFILE) {
+                String profileName = activeAccount == null ? saves.profile().playerName : activeAccount.username();
+                int highestScore = activeAccount == null ? saves.profile().highestScore : accountStats.highestScore();
+                int highestLevel = activeAccount == null ? saves.profile().highestLevel : accountStats.highestLevel();
+                int totalGames = activeAccount == null ? saves.profile().totalGames : accountStats.totalGames();
+                long totalScore = activeAccount == null ? saves.profile().totalScore : accountStats.totalScore();
                 String[] lines = {
-                    "Guest name: " + saves.profile().playerName,
-                    "Highest score: " + saves.profile().highestScore,
-                    "Highest level: " + saves.profile().highestLevel,
-                    "Total games: " + saves.profile().totalGames,
-                    "Total score: " + saves.profile().totalScore,
-                    "Click the middle area to rename your guest profile."
+                    "Player: " + profileName,
+                    "Highest score: " + highestScore,
+                    "Highest level: " + highestLevel,
+                    "Total games: " + totalGames,
+                    "Total score: " + totalScore,
+                    activeAccount == null ? "Guest profile is saved on this computer." : "Account profile is saved in MongoDB."
                 };
                 for (String s : lines) {
                     center(g, s, w / 2, y);
