@@ -25,6 +25,7 @@ public class GameWindow extends JFrame {
         return t;
     });
     private ScheduledExecutorService clock;
+    private volatile long lastApiCallNanos;
     private Question pending;
     private boolean left, right;
     private int lastLevel = 1;
@@ -97,15 +98,22 @@ public class GameWindow extends JFrame {
         panel.state = GameState.PLAYING;
         panel.requestFocusInWindow();
         if (clock != null) clock.shutdownNow();
+        lastApiCallNanos = System.nanoTime();
         clock = Executors.newSingleThreadScheduledExecutor();
         clock.scheduleAtFixedRate(() -> {
-            if (panel.state == GameState.PLAYING) requestQuestion();
-        }, 15, 15, TimeUnit.SECONDS);
+            if (panel.state == GameState.PLAYING
+                    && !panel.questionLoading
+                    && System.nanoTime() - lastApiCallNanos >= TimeUnit.SECONDS.toNanos(15)) {
+                requestQuestion();
+            }
+        }, 100, 100, TimeUnit.MILLISECONDS);
     }
 
     private void requestQuestion() {
-        if (panel.questionLoading || panel.state != GameState.PLAYING) return;
+        if (panel.questionLoading || panel.state != GameState.PLAYING
+                || System.nanoTime() - lastApiCallNanos < TimeUnit.SECONDS.toNanos(15)) return;
         panel.questionLoading = true;
+        lastApiCallNanos = System.nanoTime();
         apiExecutor.submit(() -> {
             try {
                 Question q = new FishGameAPI().fetch();
@@ -182,7 +190,7 @@ public class GameWindow extends JFrame {
         g.drawString(s, x - fm.stringWidth(s) / 2, y);
     }
     private class GamePanel extends JPanel {
-        GameState state = GameState.MENU;
+        volatile GameState state = GameState.MENU;
         final Basket basket = new Basket();
         final ScoreManager score = new ScoreManager();
         final LifeManager lives = new LifeManager();
@@ -191,7 +199,7 @@ public class GameWindow extends JFrame {
         final List<FallingObject> objects = new ArrayList<>();
         final Random random = new Random();
         long last = System.nanoTime(), lastQuestionNanos = System.nanoTime();
-        boolean questionLoading = false;
+        volatile boolean questionLoading = false;
         String apiMessage = "";
         String questionAnswer = "";
         double anim = 0;
@@ -331,6 +339,7 @@ public class GameWindow extends JFrame {
             pending = null;
             questionAnswer = "";
             state = GameState.PLAYING;
+            lastApiCallNanos = System.nanoTime();
             repaint();
         }
         String normalizePuzzleAnswer(String value) {
