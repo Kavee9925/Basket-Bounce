@@ -120,7 +120,15 @@ final class AccountDialogs {
                     try {
                         MongoDBService.UserAccount account = get();
                         onLogin.accept(account);
-                        dialog.dispose();
+                        createButton.setEnabled(false);
+                        cancelButton.setEnabled(false);
+                        status.setForeground(new Color(116, 245, 174));
+                        status.setFont(new Font("SansSerif", Font.BOLD, 12));
+                        status.setText("\u2713 Account created successfully!");
+
+                        Timer successTimer = new Timer(1600, timerEvent -> dialog.dispose());
+                        successTimer.setRepeats(false);
+                        successTimer.start();
                     } catch (Exception exception) {
                         showError(status, errorMessage(exception));
                     }
