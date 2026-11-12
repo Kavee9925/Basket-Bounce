@@ -176,6 +176,39 @@ public class GameWindow extends JFrame {
         panel.requestFocusInWindow();
     }
 
+    private void loginFromMenu() {
+        String username = panel.loginUsername.getText().trim();
+        char[] password = panel.loginPassword.getPassword();
+        if (username.isEmpty() || password.length == 0) {
+            panel.loginStatus = "Please enter your username/email and password.";
+            panel.repaint();
+            java.util.Arrays.fill(password, '\0');
+            return;
+        }
+        panel.loginStatus = "Signing in...";
+        panel.repaint();
+        new SwingWorker<MongoDBService.UserAccount, Void>() {
+            @Override
+            protected MongoDBService.UserAccount doInBackground() {
+                return MongoDBService.getInstance().login(username, password);
+            }
+
+            @Override
+            protected void done() {
+                java.util.Arrays.fill(password, '\0');
+                try {
+                    setActiveAccount(get());
+                    panel.loginStatus = "Login successful!";
+                } catch (Exception exception) {
+                    Throwable cause = exception.getCause();
+                    panel.loginStatus = cause instanceof IllegalArgumentException
+                            ? cause.getMessage() : "Cannot connect to MongoDB. Please try again.";
+                }
+                panel.repaint();
+            }
+        }.execute();
+    }
+
     private void setActiveAccount(MongoDBService.UserAccount account) {
         activeAccount = account;
         panel.guestName = account.username();
@@ -243,8 +276,16 @@ public class GameWindow extends JFrame {
         double anim = 0;
         int lightning = 0;
         String guestName = "Guest Player";
+        final JTextField loginUsername = new JTextField();
+        final JPasswordField loginPassword = new JPasswordField();
+        String loginStatus = "";
         GamePanel() {
+            setLayout(null);
             setBackground(new Color(18, 28, 52));
+            styleMenuInput(loginUsername);
+            styleMenuInput(loginPassword);
+            add(loginUsername);
+            add(loginPassword);
             new javax.swing.Timer(16, e -> {
                 tick();
                 repaint();
@@ -255,6 +296,32 @@ public class GameWindow extends JFrame {
                 }
             });
         }
+        @Override
+        public void doLayout() {
+            double scale = Math.min(getWidth() / 1000.0, getHeight() / 680.0);
+            double ox = (getWidth() - 1000 * scale) / 2.0;
+            double oy = (getHeight() - 680 * scale) / 2.0;
+            int fieldX = (int) Math.round(ox + 363 * scale);
+            int fieldWidth = (int) Math.round(274 * scale);
+            int fieldHeight = (int) Math.round(36 * scale);
+            loginUsername.setBounds(fieldX, (int) Math.round(oy + 225 * scale), fieldWidth, fieldHeight);
+            loginPassword.setBounds(fieldX, (int) Math.round(oy + 285 * scale), fieldWidth, fieldHeight);
+            boolean menuVisible = state == GameState.MENU;
+            loginUsername.setVisible(menuVisible);
+            loginPassword.setVisible(menuVisible);
+        }
+
+        private void styleMenuInput(JTextField field) {
+            field.setFont(new Font("SansSerif", Font.PLAIN, 14));
+            field.setForeground(new Color(245, 248, 255));
+            field.setCaretColor(new Color(95, 190, 255));
+            field.setBackground(new Color(20, 29, 48));
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(110, 145, 190), 1),
+                    BorderFactory.createEmptyBorder(7, 10, 7, 10)));
+            field.setOpaque(true);
+        }
+
         void newGame() {
             score.reset();
             lives.reset();
@@ -326,14 +393,11 @@ public class GameWindow extends JFrame {
                 double ox = (getWidth() - 1000 * scale) / 2.0, oy = (getHeight() - 680 * scale) / 2.0;
                 x = (int)((x - ox) / scale);
                 y = (int)((y - oy) / scale);
-                if (x >= 363 && x <= 637) {
-                    if (y >= 255 && y <= 297) start();
-                    else if (y >= 305 && y <= 347) AccountDialogs.showLogin(this, GameWindow.this::setActiveAccount);
-                    else if (y >= 355 && y <= 397) AccountDialogs.showCreateAccount(this, GameWindow.this::setActiveAccount);
-                    else if (y >= 405 && y <= 447) state = GameState.LEADERBOARD;
-                    else if (y >= 455 && y <= 497) state = GameState.HELP;
-                    else if (y >= 505 && y <= 547) state = GameState.PROFILE;
-                    else if (y >= 555 && y <= 597) state = GameState.SETTINGS;
+                if (x >= 363 && x <= 637 && y >= 340 && y <= 382) {
+                    loginFromMenu();
+                } else if (y >= 395 && y <= 437) {
+                    if (x >= 330 && x <= 490) AccountDialogs.showCreateAccount(this, GameWindow.this::setActiveAccount);
+                    else if (x >= 510 && x <= 670) start();
                 }
             } else if (state == GameState.PAUSED) {
                 if (y >= 270 && y <= 320) state = GameState.PLAYING;
@@ -389,6 +453,7 @@ public class GameWindow extends JFrame {
             Graphics2D g = (Graphics2D) gg.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             int w = getWidth(), h = getHeight();
+            doLayout();
             if (state == GameState.PLAYING || state == GameState.PAUSED || state == GameState.BONUS_QUESTION || state == GameState.LEVEL_COMPLETE) {
                 drawWorld(g, w, h);
                 if (state == GameState.PAUSED) overlay(g, "GAME PAUSED", new String[] {
@@ -545,7 +610,6 @@ public class GameWindow extends JFrame {
         void drawMenuContent(Graphics2D g, int w, int h) {
             g.setPaint(new GradientPaint(0, 0, new Color(17, 29, 65), w, h, new Color(69, 119, 153)));
             g.fillRect(0, 0, w, h);
-            // Soft decorative bubbles create depth without distracting from the menu.
             for (int i = 0; i < 22; i++) {
                 int size = 12 + (i % 4) * 9;
                 int x = (int)((i * 97 + anim * (10 + i % 3 * 4)) % (w + size)) - size;
@@ -558,39 +622,32 @@ public class GameWindow extends JFrame {
             g.setColor(new Color(255, 255, 255, 30));
             g.setStroke(new BasicStroke(2));
             g.drawRoundRect(w / 2 - 285, 42, 570, 575, 38, 38);
-            // Small floating game collectibles around the title.
             g.setColor(new Color(255, 211, 66));
             drawStar(g, w / 2 - 220, 118, 25);
             g.setColor(new Color(255, 90, 130));
             g.fillOval(w / 2 + 190, 94, 23, 23);
             g.fillOval(w / 2 + 210, 94, 23, 23);
-            g.fillPolygon(new int[] {
-                w / 2 + 190, w / 2 + 233, w / 2 + 211
-            }, new int[] {
-                108, 108, 136
-            }, 3);
+            g.fillPolygon(new int[] { w / 2 + 190, w / 2 + 233, w / 2 + 211 },
+                    new int[] { 108, 108, 136 }, 3);
             g.setColor(new Color(255, 222, 112));
-            g.setFont(new Font("SansSerif", Font.BOLD, 51));
-            center(g, "BASKET BOUNCE", w / 2, 151);
+            g.setFont(new Font("SansSerif", Font.BOLD, 43));
+            center(g, "BASKET BOUNCE", w / 2, 145);
             g.setColor(new Color(228, 240, 255));
-            g.setFont(new Font("SansSerif", Font.PLAIN, 17));
-            center(g, "Catch the Good. Dodge the Bad. Beat the Score!", w / 2, 190);
-            g.setColor(new Color(150, 225, 205));
-            g.setFont(new Font("SansSerif", Font.BOLD, 12));
-            center(g, "GUEST MODE  •  YOUR SCORES SAVE ON THIS COMPUTER", w / 2, 239);
-            // Keep every menu action in one evenly spaced, consistently sized column.
-            int x = w / 2 - 137;
-            int buttonWidth = 274;
-            int buttonHeight = 42;
-            int buttonGap = 8;
-            int firstButtonY = 255;
-            drawButton(g, "PLAY AS GUEST", x, firstButtonY, buttonWidth, buttonHeight, new Color(35, 177, 137));
-            drawButton(g, "LOGIN", x, firstButtonY + (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(64, 116, 190));
-            drawButton(g, "CREATE ACCOUNT", x, firstButtonY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(35, 157, 125));
-            drawButton(g, "LEADERBOARD", x, firstButtonY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(64, 116, 190));
-            drawButton(g, "HOW TO PLAY", x, firstButtonY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(116, 100, 190));
-            drawButton(g, "GUEST PROFILE", x, firstButtonY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(194, 133, 67));
-            drawButton(g, "SETTINGS", x, firstButtonY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight, new Color(76, 103, 132));
+            g.setFont(new Font("SansSerif", Font.PLAIN, 15));
+            center(g, "Catch the Good. Dodge the Bad. Beat the Score!", w / 2, 178);
+            g.setColor(new Color(230, 239, 255));
+            g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            center(g, "Username or Email", w / 2, 218);
+            center(g, "Password", w / 2, 278);
+            drawButton(g, "LOGIN", w / 2 - 137, 340, 274, 42, new Color(35, 139, 224));
+            drawButton(g, "CREATE ACCOUNT", w / 2 - 170, 395, 160, 42, new Color(28, 43, 68));
+            drawButton(g, "PLAY AS GUEST", w / 2 + 10, 395, 160, 42, new Color(28, 43, 68));
+            if (!loginStatus.isBlank()) {
+                g.setColor(loginStatus.startsWith("Login successful")
+                        ? new Color(120, 245, 170) : new Color(255, 205, 170));
+                g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+                center(g, loginStatus, w / 2, 470);
+            }
             g.setColor(new Color(225, 235, 250, 150));
             g.setFont(new Font("SansSerif", Font.PLAIN, 11));
             center(g, "10 LEVELS  •  5 COLLECTIBLES  •  BONUS CHALLENGES", w / 2, h - 18);
