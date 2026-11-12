@@ -225,6 +225,25 @@ public class GameWindow extends JFrame {
         panel.repaint();
     }
 
+    private void refreshProfile() {
+        if (activeAccount == null) {
+            saves.reload();
+            panel.guestName = saves.profile().playerName;
+            panel.repaint();
+            return;
+        }
+        MongoDBService.UserAccount account = activeAccount;
+        databaseExecutor.submit(() -> {
+            try {
+                accountStats = MongoDBService.getInstance().getPlayerStats(account);
+                SwingUtilities.invokeLater(panel::repaint);
+            } catch (Exception exception) {
+                System.err.println("Could not refresh player profile: " + exception.getMessage());
+                SwingUtilities.invokeLater(panel::repaint);
+            }
+        });
+    }
+
     private void drawButton(Graphics2D g, String text, int x, int y, int w, int h, Color c) {
         Graphics2D b = (Graphics2D) g.create();
         b.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -442,12 +461,25 @@ public class GameWindow extends JFrame {
             } else if (state == GameState.GAME_OVER || state == GameState.VICTORY) {
                 if (y >= 400 && y <= 455) start();
                 else if (y >= 470 && y <= 525) menu();
-            } else if (state == GameState.PROFILE || state == GameState.LEADERBOARD || state == GameState.HELP || state == GameState.SETTINGS) {
+            } else if (state == GameState.PROFILE) {
+                int buttonY = getHeight() - 65;
+                if (y >= buttonY && y <= buttonY + 42) {
+                    int buttonW = activeAccount == null ? 190 : 205;
+                    int buttonGap = 12;
+                    int totalW = activeAccount == null ? buttonW * 3 + buttonGap * 2 : buttonW * 2 + buttonGap;
+                    int buttonX = (getWidth() - totalW) / 2;
+                    if (x >= buttonX && x <= buttonX + buttonW) {
+                        menu();
+                    } else if (x >= buttonX + buttonW + buttonGap && x <= buttonX + (buttonW + buttonGap) * 2 - buttonGap) {
+                        refreshProfile();
+                    } else if (activeAccount == null && x >= buttonX + (buttonW + buttonGap) * 2
+                            && x <= buttonX + (buttonW + buttonGap) * 2 + buttonW) {
+                        AccountDialogs.showCreateAccount(this, GameWindow.this::setActiveAccount);
+                    }
+                }
+            } else if (state == GameState.LEADERBOARD || state == GameState.HELP || state == GameState.SETTINGS) {
                 if (y > getHeight() - 90) menu();
-                else if (state == GameState.PROFILE && activeAccount == null && y > 250 && y < 315) {
-                    String n = JOptionPane.showInputDialog(this, "Enter guest display name:", saves.profile().playerName);
-                    saves.rename(n);
-                } else if (state == GameState.SETTINGS && y >= 230 && y <= 280) {
+                else if (state == GameState.SETTINGS && y >= 230 && y <= 280) {
                     sound = !sound;
                 }
             } else if (state == GameState.BONUS_QUESTION) {
@@ -788,6 +820,115 @@ public class GameWindow extends JFrame {
             drawButton(g, "PLAY AGAIN", w / 2 - 125, 400, 250, 52, new Color(44, 173, 132));
             drawButton(g, "MAIN MENU", w / 2 - 125, 470, 250, 52, new Color(72, 115, 180));
         }
+        void drawPlayerProfile(Graphics2D g, int w, int h) {
+            g.setPaint(new GradientPaint(0, 0, new Color(8, 18, 48), w, h, new Color(18, 43, 86)));
+            g.fillRect(0, 0, w, h);
+            g.setColor(new Color(255, 255, 255, 15));
+            for (int i = 0; i < 34; i++) {
+                int px = (i * 137 + 29) % w;
+                int py = (i * 83 + 17) % h;
+                g.fillOval(px, py, 2 + (i % 3), 2 + (i % 3));
+            }
+
+            int panelX = 34, panelY = 22, panelW = w - 68, panelH = h - 44;
+            g.setColor(new Color(5, 13, 35, 218));
+            g.fillRoundRect(panelX, panelY, panelW, panelH, 26, 26);
+            g.setColor(new Color(72, 143, 226, 150));
+            g.setStroke(new BasicStroke(1.5f));
+            g.drawRoundRect(panelX, panelY, panelW, panelH, 26, 26);
+
+            g.setFont(new Font("SansSerif", Font.BOLD, 29));
+            g.setColor(new Color(255, 218, 91));
+            center(g, "PLAYER PROFILE", w / 2, 62);
+            g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            g.setColor(new Color(205, 222, 248));
+            center(g, "BASKET BOUNCE  •  PLAYER RECORD & LIFETIME STATISTICS", w / 2, 84);
+
+            boolean registered = activeAccount != null;
+            String playerName = registered ? activeAccount.username() : saves.profile().playerName;
+            String subline = registered ? activeAccount.email() : "Guest session • Progress saved on this computer";
+            if (playerName == null || playerName.isBlank()) playerName = "Guest Player";
+            int avatarX = 62, avatarY = 106;
+            g.setColor(new Color(24, 151, 225));
+            g.fillOval(avatarX, avatarY, 58, 58);
+            g.setColor(new Color(139, 218, 255));
+            g.setStroke(new BasicStroke(2f));
+            g.drawOval(avatarX, avatarY, 58, 58);
+            g.setFont(new Font("SansSerif", Font.BOLD, 25));
+            g.setColor(Color.WHITE);
+            center(g, playerName.substring(0, 1).toUpperCase(Locale.ROOT), avatarX + 29, avatarY + 38);
+            g.setFont(new Font("SansSerif", Font.BOLD, 17));
+            g.setColor(new Color(239, 246, 255));
+            g.drawString(playerName, 137, 128);
+
+            String status = registered ? "REGISTERED" : "GUEST SESSION";
+            Color statusColor = registered ? new Color(45, 174, 132) : new Color(194, 145, 45);
+            g.setFont(new Font("SansSerif", Font.BOLD, 10));
+            int badgeW = g.getFontMetrics().stringWidth(status) + 24;
+            g.setColor(statusColor);
+            g.fillRoundRect(137, 139, badgeW, 22, 11, 11);
+            g.setColor(Color.WHITE);
+            g.drawString(status, 149, 154);
+            g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            g.setColor(new Color(192, 211, 239));
+            g.drawString(subline == null ? "" : subline, 137, 180);
+
+            int highestScore = registered ? accountStats.highestScore() : saves.profile().highestScore;
+            int highestLevel = registered ? accountStats.highestLevel() : saves.profile().highestLevel;
+            int totalGames = registered ? accountStats.totalGames() : saves.profile().totalGames;
+            long totalScore = registered ? accountStats.totalScore() : saves.profile().totalScore;
+            long averageScore = totalGames == 0 ? 0 : totalScore / totalGames;
+            int left = 58, gap = 14, cardW = (w - 116 - gap * 2) / 3, cardH = 112;
+            int top1 = 205, top2 = 330;
+            drawProfileStat(g, left, top1, cardW, cardH, "HIGHEST SCORE", String.valueOf(highestScore), "Personal best score", new Color(255, 207, 75));
+            drawProfileStat(g, left + cardW + gap, top1, cardW, cardH, "HIGHEST LEVEL", "Level " + highestLevel, "Furthest level reached", new Color(31, 190, 239));
+            drawProfileStat(g, left + (cardW + gap) * 2, top1, cardW, cardH, "GAMES PLAYED", String.valueOf(totalGames), "Total games launched", new Color(161, 137, 255));
+            drawProfileStat(g, left, top2, cardW, cardH, "TOTAL SCORE", String.valueOf(totalScore), "Lifetime points earned", new Color(57, 216, 166));
+            drawProfileStat(g, left + cardW + gap, top2, cardW, cardH, "AVERAGE SCORE", String.valueOf(averageScore), "Average points per game", new Color(57, 216, 166));
+            drawProfileStat(g, left + (cardW + gap) * 2, top2, cardW, cardH, "PLAYER TYPE", registered ? "Registered" : "Guest", registered ? "Account profile" : "Local guest profile", new Color(31, 190, 239));
+
+            int infoY = h - 105;
+            g.setColor(new Color(18, 37, 72));
+            g.fillRoundRect(58, infoY, w - 116, 30, 10, 10);
+            g.setColor(new Color(95, 145, 204, 150));
+            g.drawRoundRect(58, infoY, w - 116, 30, 10, 10);
+            g.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            g.setColor(new Color(208, 225, 248));
+            center(g, registered ? "Your Basket Bounce profile and game results are saved to MongoDB."
+                    : "Guest progress is saved locally. Create an account to keep a registered player record.", w / 2, infoY + 19);
+
+            int buttonY = h - 65;
+            int buttonW = registered ? 205 : 190;
+            int buttonGap = 12;
+            int totalW = registered ? buttonW * 2 + buttonGap : buttonW * 3 + buttonGap * 2;
+            int buttonX = (w - totalW) / 2;
+            drawButton(g, "BACK TO MENU", buttonX, buttonY, buttonW, 42, new Color(54, 91, 145));
+            drawButton(g, "REFRESH", buttonX + buttonW + buttonGap, buttonY, buttonW, 42, new Color(24, 151, 224));
+            if (!registered) {
+                drawButton(g, "CREATE ACCOUNT", buttonX + (buttonW + buttonGap) * 2, buttonY, buttonW, 42, new Color(43, 180, 139));
+            }
+        }
+
+        void drawProfileStat(Graphics2D g, int x, int y, int width, int height,
+                             String heading, String value, String detail, Color accent) {
+            g.setColor(new Color(13, 31, 65));
+            g.fillRoundRect(x, y, width, height, 15, 15);
+            g.setColor(new Color(71, 112, 174, 145));
+            g.drawRoundRect(x, y, width, height, 15, 15);
+            g.setColor(accent);
+            g.fillRoundRect(x + 10, y + 8, width - 20, 4, 4, 4);
+            g.setFont(new Font("SansSerif", Font.BOLD, 10));
+            g.setColor(new Color(190, 213, 245));
+            g.drawString(heading, x + 15, y + 31);
+            g.setFont(new Font("SansSerif", Font.BOLD, 23));
+            g.setColor(accent);
+            String shownValue = value.length() > 15 ? value.substring(0, 13) + "…" : value;
+            g.drawString(shownValue, x + 15, y + 64);
+            g.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            g.setColor(new Color(194, 211, 238));
+            g.drawString(detail, x + 15, y + 88);
+        }
+
         void drawInfo(Graphics2D g, int w, int h) {
             g.setColor(new Color(24, 38, 67));
             g.fillRect(0, 0, w, h);
@@ -797,23 +938,8 @@ public class GameWindow extends JFrame {
             g.setFont(new Font("SansSerif", Font.PLAIN, 17));
             int y = 130;
             if (state == GameState.PROFILE) {
-                String profileName = activeAccount == null ? saves.profile().playerName : activeAccount.username();
-                int highestScore = activeAccount == null ? saves.profile().highestScore : accountStats.highestScore();
-                int highestLevel = activeAccount == null ? saves.profile().highestLevel : accountStats.highestLevel();
-                int totalGames = activeAccount == null ? saves.profile().totalGames : accountStats.totalGames();
-                long totalScore = activeAccount == null ? saves.profile().totalScore : accountStats.totalScore();
-                String[] lines = {
-                    "Player: " + profileName,
-                    "Highest score: " + highestScore,
-                    "Highest level: " + highestLevel,
-                    "Total games: " + totalGames,
-                    "Total score: " + totalScore,
-                    activeAccount == null ? "Guest profile is saved on this computer." : "Account profile is saved in MongoDB."
-                };
-                for (String s : lines) {
-                    center(g, s, w / 2, y);
-                    y += 38;
-                }
+                drawPlayerProfile(g, w, h);
+                return;
             } else if (state == GameState.LEADERBOARD) {
                 center(g, "TOP GUEST SCORES (saved on this computer)", w / 2, y);
                 y += 45;

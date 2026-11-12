@@ -56,6 +56,10 @@ public class SaveManager {
         }
     }
 
+    public synchronized void reload() {
+        load();
+    }
+
     public GuestProfile profile() {
         return profile;
     }
