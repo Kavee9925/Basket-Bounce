@@ -37,6 +37,7 @@ public class GameWindow extends JFrame {
         return t;
     });
     private volatile MongoDBService.UserAccount activeAccount;
+    private volatile boolean sessionActive;
     private volatile MongoDBService.PlayerStats accountStats = new MongoDBService.PlayerStats(0, 1, 0, 0);
 
     public GameWindow() {
@@ -211,6 +212,7 @@ public class GameWindow extends JFrame {
 
     private void setActiveAccount(MongoDBService.UserAccount account) {
         activeAccount = account;
+        sessionActive = true;
         panel.guestName = account.username();
         databaseExecutor.submit(() -> {
             try {
@@ -306,7 +308,7 @@ public class GameWindow extends JFrame {
             int fieldHeight = (int) Math.round(36 * scale);
             loginUsername.setBounds(fieldX, (int) Math.round(oy + 225 * scale), fieldWidth, fieldHeight);
             loginPassword.setBounds(fieldX, (int) Math.round(oy + 285 * scale), fieldWidth, fieldHeight);
-            boolean menuVisible = state == GameState.MENU;
+            boolean menuVisible = state == GameState.MENU && !sessionActive;
             loginUsername.setVisible(menuVisible);
             loginPassword.setVisible(menuVisible);
         }
@@ -393,11 +395,36 @@ public class GameWindow extends JFrame {
                 double ox = (getWidth() - 1000 * scale) / 2.0, oy = (getHeight() - 680 * scale) / 2.0;
                 x = (int)((x - ox) / scale);
                 y = (int)((y - oy) / scale);
-                if (x >= 363 && x <= 637 && y >= 340 && y <= 382) {
+                if (sessionActive) {
+                    if (x >= 365 && x <= 635 && y >= 245 && y <= 290) {
+                        start();
+                    } else if (x >= 365 && x <= 635 && y >= 300 && y <= 345) {
+                        state = GameState.PROFILE;
+                    } else if (x >= 365 && x <= 635 && y >= 355 && y <= 400) {
+                        state = GameState.LEADERBOARD;
+                    } else if (x >= 220 && x <= 380 && y >= 425 && y <= 470) {
+                        state = GameState.HELP;
+                    } else if (x >= 420 && x <= 580 && y >= 425 && y <= 470) {
+                        state = GameState.SETTINGS;
+                    } else if (x >= 620 && x <= 780 && y >= 425 && y <= 470) {
+                        activeAccount = null;
+                        sessionActive = false;
+                        loginStatus = "";
+                        loginUsername.setText("");
+                        loginPassword.setText("");
+                        menu();
+                    }
+                } else if (x >= 363 && x <= 637 && y >= 340 && y <= 382) {
                     loginFromMenu();
                 } else if (y >= 395 && y <= 437) {
-                    if (x >= 330 && x <= 490) AccountDialogs.showCreateAccount(this, GameWindow.this::setActiveAccount);
-                    else if (x >= 510 && x <= 670) start();
+                    if (x >= 330 && x <= 490) {
+                        AccountDialogs.showCreateAccount(this, GameWindow.this::setActiveAccount);
+                    } else if (x >= 510 && x <= 670) {
+                        activeAccount = null;
+                        sessionActive = true;
+                        guestName = saves.profile().playerName;
+                        loginStatus = "";
+                    }
                 }
             } else if (state == GameState.PAUSED) {
                 if (y >= 270 && y <= 320) state = GameState.PLAYING;
@@ -608,6 +635,10 @@ public class GameWindow extends JFrame {
             menu.dispose();
         }
         void drawMenuContent(Graphics2D g, int w, int h) {
+            if (sessionActive) {
+                drawHomeMenuContent(g, w, h);
+                return;
+            }
             g.setPaint(new GradientPaint(0, 0, new Color(17, 29, 65), w, h, new Color(69, 119, 153)));
             g.fillRect(0, 0, w, h);
             for (int i = 0; i < 22; i++) {
@@ -652,6 +683,35 @@ public class GameWindow extends JFrame {
             g.setFont(new Font("SansSerif", Font.PLAIN, 11));
             center(g, "10 LEVELS  •  5 COLLECTIBLES  •  BONUS CHALLENGES", w / 2, h - 18);
         }
+        void drawHomeMenuContent(Graphics2D g, int w, int h) {
+            g.setPaint(new GradientPaint(0, 0, new Color(17, 29, 65), w, h, new Color(69, 119, 153)));
+            g.fillRect(0, 0, w, h);
+            for (int i = 0; i < 22; i++) {
+                int size = 12 + (i % 4) * 9;
+                int x = (int)((i * 97 + anim * (10 + i % 3 * 4)) % (w + size)) - size;
+                int y = (i * 71) % h;
+                g.setColor(new Color(255, 255, 255, 22 + (i % 3) * 7));
+                g.fillOval(x, y, size, size);
+            }
+            g.setColor(new Color(8, 15, 35, 75));
+            g.fillRoundRect(w / 2 - 285, 42, 570, 575, 38, 38);
+            g.setColor(new Color(255, 255, 255, 30));
+            g.setStroke(new BasicStroke(2));
+            g.drawRoundRect(w / 2 - 285, 42, 570, 575, 38, 38);
+            g.setColor(new Color(255, 222, 112));
+            g.setFont(new Font("SansSerif", Font.BOLD, 43));
+            center(g, "BASKET BOUNCE", w / 2, 145);
+            g.setColor(new Color(228, 240, 255));
+            g.setFont(new Font("SansSerif", Font.PLAIN, 15));
+            center(g, "Catch the Good. Dodge the Bad. Beat the Score!", w / 2, 178);
+            drawButton(g, "PLAY GAME", w / 2 - 135, 245, 270, 45, new Color(35, 139, 224));
+            drawButton(g, "PROFILE", w / 2 - 135, 300, 270, 45, new Color(28, 43, 68));
+            drawButton(g, "LEADERBOARD", w / 2 - 135, 355, 270, 45, new Color(28, 43, 68));
+            drawCompactButton(g, "HOW TO PLAY", w / 2 - 280, 425, 160, 45, new Color(54, 78, 120));
+            drawCompactButton(g, "SETTINGS", w / 2 - 80, 425, 160, 45, new Color(35, 85, 145));
+            drawCompactButton(g, "LOGOUT", w / 2 + 120, 425, 160, 45, new Color(165, 75, 85));
+        }
+
         void drawStar(Graphics2D g, int cx, int cy, int radius) {
             Polygon star = new Polygon();
             for (int i = 0; i < 10; i++) {
