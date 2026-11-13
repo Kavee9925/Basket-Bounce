@@ -353,8 +353,9 @@ public class GameWindow extends JFrame {
             int fieldX = (int) Math.round(ox + 363 * scale);
             int fieldWidth = (int) Math.round(274 * scale);
             int fieldHeight = (int) Math.round(36 * scale);
-            loginUsername.setBounds(fieldX, (int) Math.round(oy + 225 * scale), fieldWidth, fieldHeight);
-            loginPassword.setBounds(fieldX, (int) Math.round(oy + 285 * scale), fieldWidth, fieldHeight);
+            // Keep the login form comfortably below the Basket Bounce logo.
+            loginUsername.setBounds(fieldX, (int) Math.round(oy + 280 * scale), fieldWidth, fieldHeight);
+            loginPassword.setBounds(fieldX, (int) Math.round(oy + 340 * scale), fieldWidth, fieldHeight);
             boolean menuVisible = state == GameState.MENU && !sessionActive;
             loginUsername.setVisible(menuVisible);
             loginPassword.setVisible(menuVisible);
@@ -461,12 +462,12 @@ public class GameWindow extends JFrame {
                         loginPassword.setText("");
                         menu();
                     }
-                } else if (x >= 363 && x <= 637 && y >= 340 && y <= 382) {
+                } else if (x >= 363 && x <= 637 && y >= 395 && y <= 437) {
                     loginFromMenu();
-                } else if (y >= 395 && y <= 437) {
-                    if (x >= 330 && x <= 490) {
+                } else if (y >= 450 && y <= 492) {
+                    if (x >= 302 && x <= 492) {
                         AccountDialogs.showCreateAccount(this, GameWindow.this::setActiveAccount);
-                    } else if (x >= 510 && x <= 670) {
+                    } else if (x >= 508 && x <= 698) {
                         activeAccount = null;
                         sessionActive = true;
                         guestName = saves.profile().playerName;
@@ -704,18 +705,24 @@ public class GameWindow extends JFrame {
                 drawHomeMenuContent(g, w, h);
                 return;
             }
-            g.setColor(new Color(230, 239, 255));
-            g.setFont(new Font("SansSerif", Font.PLAIN, 12));
-            center(g, "Username or Email", w / 2, 218);
-            center(g, "Password", w / 2, 278);
-            drawButton(g, "LOGIN", w / 2 - 137, 340, 274, 42, new Color(35, 139, 224));
-            drawButton(g, "CREATE ACCOUNT", w / 2 - 170, 395, 160, 42, new Color(28, 43, 68));
-            drawButton(g, "PLAY AS GUEST", w / 2 + 10, 395, 160, 42, new Color(28, 43, 68));
+            // Clear, styled labels and a lower form keep the logo unobstructed.
+            g.setFont(new Font("SansSerif", Font.BOLD, 15));
+            g.setColor(new Color(24, 48, 75, 175));
+            center(g, "Username or Email", w / 2 + 1, 274);
+            center(g, "Password", w / 2 + 1, 334);
+            g.setColor(new Color(255, 232, 145));
+            center(g, "Username or Email", w / 2, 273);
+            g.setColor(new Color(190, 247, 255));
+            center(g, "Password", w / 2, 333);
+
+            drawButton(g, "LOGIN", w / 2 - 137, 395, 274, 42, new Color(35, 139, 224));
+            drawButton(g, "CREATE ACCOUNT", w / 2 - 198, 450, 190, 42, new Color(28, 43, 68));
+            drawButton(g, "PLAY AS GUEST", w / 2 + 8, 450, 190, 42, new Color(28, 43, 68));
             if (!loginStatus.isBlank()) {
                 g.setColor(loginStatus.startsWith("Login successful")
                         ? new Color(120, 245, 170) : new Color(255, 205, 170));
-                g.setFont(new Font("SansSerif", Font.PLAIN, 12));
-                center(g, loginStatus, w / 2, 470);
+                g.setFont(new Font("SansSerif", Font.BOLD, 12));
+                center(g, loginStatus, w / 2, 525);
             }
             g.setColor(new Color(225, 235, 250, 150));
             g.setFont(new Font("SansSerif", Font.PLAIN, 11));
