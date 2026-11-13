@@ -6,6 +6,8 @@ import com.basketbounce.model.*;
 import com.basketbounce.storage.*;
 
 import javax.swing.*;
+import javax.imageio.ImageIO;
+import java.io.File;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
@@ -283,6 +285,38 @@ public class GameWindow extends JFrame {
     }
     private class GamePanel extends JPanel {
         volatile GameState state = GameState.MENU;
+        private final Image menuBackground = loadMenuImage("image 3.jpg");
+        private final Image guestBackground = loadMenuImage("image 1.jpg");
+        private final Image accountBackground = loadMenuImage("image 2.jpg");
+
+        private Image loadMenuImage(String fileName) {
+            try {
+                java.net.URL resource = getClass().getResource("/Images/" + fileName);
+                if (resource != null) return ImageIO.read(resource);
+                File imageFile = new File("src/Images", fileName);
+                if (imageFile.isFile()) return ImageIO.read(imageFile);
+            } catch (Exception exception) {
+                System.err.println("Could not load menu background " + fileName + ": " + exception.getMessage());
+            }
+            return null;
+        }
+
+        private void drawMenuBackground(Graphics2D g, Image image, int w, int h) {
+            if (image == null) {
+                g.setPaint(new GradientPaint(0, 0, new Color(17, 29, 65), w, h, new Color(69, 119, 153)));
+                g.fillRect(0, 0, w, h);
+                return;
+            }
+            int imageWidth = image.getWidth(this);
+            int imageHeight = image.getHeight(this);
+            if (imageWidth <= 0 || imageHeight <= 0) return;
+            double scale = Math.max(w / (double) imageWidth, h / (double) imageHeight);
+            int drawWidth = (int) Math.ceil(imageWidth * scale);
+            int drawHeight = (int) Math.ceil(imageHeight * scale);
+            g.drawImage(image, (w - drawWidth) / 2, (h - drawHeight) / 2, drawWidth, drawHeight, this);
+            g.setColor(new Color(8, 15, 35, 48));
+            g.fillRect(0, 0, w, h);
+        }
         final Basket basket = new Basket();
         final ScoreManager score = new ScoreManager();
         final LifeManager lives = new LifeManager();
@@ -671,33 +705,7 @@ public class GameWindow extends JFrame {
                 drawHomeMenuContent(g, w, h);
                 return;
             }
-            g.setPaint(new GradientPaint(0, 0, new Color(17, 29, 65), w, h, new Color(69, 119, 153)));
-            g.fillRect(0, 0, w, h);
-            for (int i = 0; i < 22; i++) {
-                int size = 12 + (i % 4) * 9;
-                int x = (int)((i * 97 + anim * (10 + i % 3 * 4)) % (w + size)) - size;
-                int y = (i * 71) % h;
-                g.setColor(new Color(255, 255, 255, 22 + (i % 3) * 7));
-                g.fillOval(x, y, size, size);
-            }
-            g.setColor(new Color(8, 15, 35, 75));
-            g.fillRoundRect(w / 2 - 285, 42, 570, 575, 38, 38);
-            g.setColor(new Color(255, 255, 255, 30));
-            g.setStroke(new BasicStroke(2));
-            g.drawRoundRect(w / 2 - 285, 42, 570, 575, 38, 38);
-            g.setColor(new Color(255, 211, 66));
-            drawStar(g, w / 2 - 220, 118, 25);
-            g.setColor(new Color(255, 90, 130));
-            g.fillOval(w / 2 + 190, 94, 23, 23);
-            g.fillOval(w / 2 + 210, 94, 23, 23);
-            g.fillPolygon(new int[] { w / 2 + 190, w / 2 + 233, w / 2 + 211 },
-                    new int[] { 108, 108, 136 }, 3);
-            g.setColor(new Color(255, 222, 112));
-            g.setFont(new Font("SansSerif", Font.BOLD, 43));
-            center(g, "BASKET BOUNCE", w / 2, 145);
-            g.setColor(new Color(228, 240, 255));
-            g.setFont(new Font("SansSerif", Font.PLAIN, 15));
-            center(g, "Catch the Good. Dodge the Bad. Beat the Score!", w / 2, 178);
+            drawMenuBackground(g, menuBackground, w, h);
             g.setColor(new Color(230, 239, 255));
             g.setFont(new Font("SansSerif", Font.PLAIN, 12));
             center(g, "Username or Email", w / 2, 218);
@@ -716,26 +724,7 @@ public class GameWindow extends JFrame {
             center(g, "10 LEVELS  •  5 COLLECTIBLES  •  BONUS CHALLENGES", w / 2, h - 18);
         }
         void drawHomeMenuContent(Graphics2D g, int w, int h) {
-            g.setPaint(new GradientPaint(0, 0, new Color(17, 29, 65), w, h, new Color(69, 119, 153)));
-            g.fillRect(0, 0, w, h);
-            for (int i = 0; i < 22; i++) {
-                int size = 12 + (i % 4) * 9;
-                int x = (int)((i * 97 + anim * (10 + i % 3 * 4)) % (w + size)) - size;
-                int y = (i * 71) % h;
-                g.setColor(new Color(255, 255, 255, 22 + (i % 3) * 7));
-                g.fillOval(x, y, size, size);
-            }
-            g.setColor(new Color(8, 15, 35, 75));
-            g.fillRoundRect(w / 2 - 285, 42, 570, 575, 38, 38);
-            g.setColor(new Color(255, 255, 255, 30));
-            g.setStroke(new BasicStroke(2));
-            g.drawRoundRect(w / 2 - 285, 42, 570, 575, 38, 38);
-            g.setColor(new Color(255, 222, 112));
-            g.setFont(new Font("SansSerif", Font.BOLD, 43));
-            center(g, "BASKET BOUNCE", w / 2, 145);
-            g.setColor(new Color(228, 240, 255));
-            g.setFont(new Font("SansSerif", Font.PLAIN, 15));
-            center(g, "Catch the Good. Dodge the Bad. Beat the Score!", w / 2, 178);
+            drawMenuBackground(g, activeAccount == null ? guestBackground : accountBackground, w, h);
             drawButton(g, "PLAY GAME", w / 2 - 135, 245, 270, 45, new Color(35, 139, 224));
             drawButton(g, "PROFILE", w / 2 - 135, 300, 270, 45, new Color(28, 43, 68));
             drawButton(g, "LEADERBOARD", w / 2 - 135, 355, 270, 45, new Color(28, 43, 68));
