@@ -302,20 +302,14 @@ public class GameWindow extends JFrame {
         }
 
         private void drawMenuBackground(Graphics2D g, Image image, int w, int h) {
+            // Paint the background across the complete window. Drawing it directly
+            // at the panel size keeps all three menu images visible without side bars.
             if (image == null) {
                 g.setPaint(new GradientPaint(0, 0, new Color(17, 29, 65), w, h, new Color(69, 119, 153)));
                 g.fillRect(0, 0, w, h);
                 return;
             }
-            int imageWidth = image.getWidth(this);
-            int imageHeight = image.getHeight(this);
-            if (imageWidth <= 0 || imageHeight <= 0) return;
-            double scale = Math.max(w / (double) imageWidth, h / (double) imageHeight);
-            int drawWidth = (int) Math.ceil(imageWidth * scale);
-            int drawHeight = (int) Math.ceil(imageHeight * scale);
-            g.drawImage(image, (w - drawWidth) / 2, (h - drawHeight) / 2, drawWidth, drawHeight, this);
-            g.setColor(new Color(8, 15, 35, 48));
-            g.fillRect(0, 0, w, h);
+            g.drawImage(image, 0, 0, w, h, this);
         }
         final Basket basket = new Basket();
         final ScoreManager score = new ScoreManager();
@@ -692,6 +686,11 @@ public class GameWindow extends JFrame {
             }
         }
         void drawMenu(Graphics2D g, int w, int h) {
+            Image background = !sessionActive
+                    ? menuBackground
+                    : (activeAccount == null ? guestBackground : accountBackground);
+            drawMenuBackground(g, background, w, h);
+
             double scale = Math.min(w / 1000.0, h / 680.0);
             double ox = (w - 1000 * scale) / 2.0, oy = (h - 680 * scale) / 2.0;
             Graphics2D menu = (Graphics2D) g.create();
@@ -705,7 +704,6 @@ public class GameWindow extends JFrame {
                 drawHomeMenuContent(g, w, h);
                 return;
             }
-            drawMenuBackground(g, menuBackground, w, h);
             g.setColor(new Color(230, 239, 255));
             g.setFont(new Font("SansSerif", Font.PLAIN, 12));
             center(g, "Username or Email", w / 2, 218);
@@ -724,7 +722,6 @@ public class GameWindow extends JFrame {
             center(g, "10 LEVELS  •  5 COLLECTIBLES  •  BONUS CHALLENGES", w / 2, h - 18);
         }
         void drawHomeMenuContent(Graphics2D g, int w, int h) {
-            drawMenuBackground(g, activeAccount == null ? guestBackground : accountBackground, w, h);
             drawButton(g, "PLAY GAME", w / 2 - 135, 245, 270, 45, new Color(35, 139, 224));
             drawButton(g, "PROFILE", w / 2 - 135, 300, 270, 45, new Color(28, 43, 68));
             drawButton(g, "LEADERBOARD", w / 2 - 135, 355, 270, 45, new Color(28, 43, 68));
