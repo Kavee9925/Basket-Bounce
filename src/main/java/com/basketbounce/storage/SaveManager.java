@@ -25,7 +25,8 @@ public class SaveManager {
             if (Files.exists(file)) {
                 Data d = gson.fromJson(Files.readString(file), Data.class);
                 profile = d.profile == null ? new GuestProfile() : d.profile;
-                runs = d.runs == null ? new ArrayList<>() : d.runs;
+                // Guest runs from older versions are intentionally discarded; guest scores are not ranked.
+                runs = new ArrayList<>();
             } else {
                 profile = new GuestProfile();
                 runs = new ArrayList<>();
@@ -41,9 +42,7 @@ public class SaveManager {
         profile.totalScore += score;
         profile.highestScore = Math.max(profile.highestScore, score);
         profile.highestLevel = Math.max(profile.highestLevel, level);
-        runs.add(new Run(profile.playerName, score, level, java.time.LocalDate.now().toString()));
-        runs.sort(Comparator.comparingInt(Run::score).reversed());
-        if (runs.size() > 50) runs = runs.subList(0, 50);
+        // Guest results update only the local guest profile. They are never leaderboard entries.
         persist();
     }
 

@@ -9,12 +9,15 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOptions;
 import org.bson.Document;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.time.LocalDate;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static com.mongodb.client.model.Filters.*;
@@ -34,6 +37,7 @@ public final class MongoDBService implements AutoCloseable {
 
     public record UserAccount(String id, String fullName, String username, String email) { }
     public record PlayerStats(int highestScore, int highestLevel, int totalGames, long totalScore) { }
+    public record LeaderboardEntry(String username, int score, int level, String playedOn) { }
 
     private MongoDBService() { }
 
@@ -163,6 +167,20 @@ public final class MongoDBService implements AutoCloseable {
                 max("highestLevel", level),
                 set("updatedAt", now)
         ), new UpdateOptions().upsert(true));
+    }
+
+    public synchronized List<LeaderboardEntry> getLeaderboard() {
+        initialize();
+        List<LeaderboardEntry> entries = new ArrayList<>();
+        for (Document run : gameRuns.find().sort(Sorts.descending("score", "createdAt")).limit(10)) {
+            entries.add(new LeaderboardEntry(
+                    run.getString("username"),
+                    run.getInteger("score", 0),
+                    run.getInteger("level", 1),
+                    run.getString("playedOn")
+            ));
+        }
+        return List.copyOf(entries);
     }
 
     public synchronized PlayerStats getPlayerStats(UserAccount account) {
