@@ -981,9 +981,6 @@ public class GameWindow extends JFrame {
                 return;
             } else if (state == GameState.LEADERBOARD) {
                 if (activeAccount == null) {
-                    g.setColor(new Color(255, 218, 91));
-                    g.setFont(new Font("SansSerif", Font.BOLD, 25));
-                    center(g, "LEADERBOARD", w / 2, 150);
                     g.setColor(new Color(220, 232, 250));
                     g.setFont(new Font("SansSerif", Font.BOLD, 19));
                     center(g, "NOT AVAILABLE FOR GUEST PLAYERS", w / 2, 245);
@@ -991,9 +988,6 @@ public class GameWindow extends JFrame {
                     center(g, "Only registered players can appear on the leaderboard.", w / 2, 285);
                     center(g, "Create an account and log in to compete for a rank.", w / 2, 315);
                 } else {
-                    g.setColor(new Color(255, 218, 91));
-                    g.setFont(new Font("SansSerif", Font.BOLD, 25));
-                    center(g, "REGISTERED PLAYERS LEADERBOARD", w / 2, 105);
                     g.setColor(new Color(220, 232, 250));
                     g.setFont(new Font("SansSerif", Font.PLAIN, 14));
                     int rank = 1;
